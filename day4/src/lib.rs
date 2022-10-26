@@ -1,6 +1,5 @@
 use std::error::Error;
 use std::fs;
-use std::ops::Sub;
 
 pub struct Config {
     pub file_path: String,
@@ -49,22 +48,15 @@ impl Bingo {
             winning_board: Board::new(),
         }
     }
+
     fn builder(s: &str) -> Bingo {
         let mut bingo = Bingo::new();
-        let (numbers, boards) = s.split_once("\r\n\r\n").expect("no newline");
+        let (numbers, boards) = s.split_once("\n\n").expect("no newline");
         bingo.numbers = numbers.split(",").map(|x| x.parse().expect("")).collect::<Vec<_>>();
-        for board in boards.split("\r\n\r\n") {
+        for board in boards.split("\n\n") {
             bingo.boards.push(Board::builder(board));
         }
         bingo
-    }
-    fn from(&mut self, s: &str) -> Result<&mut Bingo, Box<dyn Error>> {
-        let (numbers, boards) = s.split_once("\r\n\r\n").expect("no newline");
-        self.numbers = numbers.split(",").map(|x| x.parse().expect("")).collect::<Vec<_>>();
-        for board in boards.split("\r\n\r\n") {
-            self.boards.push(Board::builder(board));
-        }
-        Ok(self)
     }
 
     fn play(&mut self) -> Result<&Bingo, &str> {
@@ -152,7 +144,7 @@ impl Field {
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>>
 {
-    let content = fs::read_to_string(config.file_path)?;
+    let content = fs::read_to_string(config.file_path)?.replace("\r\n","\n");
     let mut sub = Submarine::new();
     sub.bingo = Bingo::builder(content.as_str());
     println!("Answer {}", sub.bingo.play()?.get());
@@ -185,15 +177,8 @@ mod tests {
 18  8 23 26 20
 22 11 13  6  5
  2  0 12  3  7";
-        let mut bingo: Bingo = Bingo {
-            numbers: vec![],
-            boards: vec![],
-            winning_number: 0,
-            winning_board: Board {
-                fields: [[Field { value: 0, drawn: false }; 5]; 5]
-            },
-        };
-        bingo.from(content).expect("REASON").play().expect("REASON");
+        let mut bingo = Bingo::builder(content);
+        bingo.play().expect("help");
         for board in bingo.boards {
             for (i, row) in board.fields.iter().enumerate() {
                 for (j, field) in row.iter().enumerate() {
@@ -274,15 +259,8 @@ mod tests {
 18  8 23 26 20
 22 11 13  6  5
  2  0 12  3  7";
-        let mut bingo: Bingo = Bingo {
-            numbers: vec![],
-            boards: vec![],
-            winning_number: 0,
-            winning_board: Board {
-                fields: [[Field { value: 0, drawn: false }; 5]; 5]
-            },
-        };
-        assert_eq!(18, bingo.from(content).expect("").boards.get(1).expect("").fields[1][1].value);
+        let bingo = Bingo::builder(content);
+        assert_eq!(18, bingo.boards.get(1).expect("").fields[1][1].value);
     }
 
     #[test]
