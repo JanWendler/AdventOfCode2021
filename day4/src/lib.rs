@@ -32,6 +32,10 @@ impl Submarine {
     }
 }
 
+enum Strategy{
+    Win,
+    Lose
+}
 struct Bingo {
     numbers: Vec<u32>,
     boards: Vec<Board>,
@@ -59,14 +63,22 @@ impl Bingo {
         bingo
     }
 
-    fn play(&mut self) -> Result<&Bingo, &str> {
+    fn play(&mut self, strat: Strategy) -> Result<&Bingo, &str> {
         for number in self.numbers.iter() {
             for board in self.boards.iter_mut() {
                 board.mark(number);
-                if board.check() {
-                    self.winning_number = *number;
-                    self.winning_board = *board;
-                    return Ok(self);
+                if board.has_bingo() {
+                    match strat {
+                        Strategy::Win => {
+                            self.winning_number = *number;
+                            self.winning_board = *board;
+                            return Ok(self);
+                        }
+                        Strategy::Lose => {
+
+                        }
+                    }
+
                 }
             }
         }
@@ -113,7 +125,7 @@ impl Board {
         }
         self
     }
-    fn check(&self) -> bool {
+    fn has_bingo(&self) -> bool {
         for row in self.fields.iter() {
             for (i, field) in row.iter().enumerate() {
                 if field.drawn {
@@ -210,11 +222,11 @@ mod tests {
                                           21  9 14 16  7
                                           6 10  3 18  5
                                           1 12 20 15 19");
-        assert_eq!(false, board.check());
+        assert_eq!(false, board.has_bingo());
         for i in 0..5 {
             board.fields[1][i].drawn = true;
         }
-        assert_eq!(true, board.check());
+        assert_eq!(true, board.has_bingo());
     }
 
     #[test]
