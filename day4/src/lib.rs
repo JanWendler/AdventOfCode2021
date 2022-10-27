@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::fmt::Formatter;
 use std::fs;
 
 pub struct Config {
@@ -32,10 +33,11 @@ impl Submarine {
     }
 }
 
-enum Strategy{
+enum Strategy {
     Win,
-    Lose
+    Lose,
 }
+
 struct Bingo {
     numbers: Vec<u32>,
     boards: Vec<Board>,
@@ -56,7 +58,7 @@ impl Bingo {
     fn builder(s: &str) -> Bingo {
         let mut bingo = Bingo::new();
         let (numbers, boards) = s.split_once("\n\n").expect("no newline");
-        bingo.numbers = numbers.split(",").map(|x| x.parse().expect("")).collect::<Vec<_>>();
+        bingo.numbers = numbers.split(',').map(|x| x.parse().expect("")).collect::<Vec<_>>();
         for board in boards.split("\n\n") {
             bingo.boards.push(Board::builder(board));
         }
@@ -64,8 +66,10 @@ impl Bingo {
     }
 
     fn play(&mut self, strat: Strategy) -> Result<&Bingo, &str> {
+        let mut winners:Vec<usize> = vec![];
+        let num_of_boards = self.boards.len();
         for number in self.numbers.iter() {
-            for board in self.boards.iter_mut() {
+            for (n, board) in self.boards.iter_mut().enumerate() {
                 board.mark(number);
                 if board.has_bingo() {
                     match strat {
@@ -75,10 +79,17 @@ impl Bingo {
                             return Ok(self);
                         }
                         Strategy::Lose => {
+                            if !winners.contains(&n) {
+                                winners.push(n);
+                                if winners.len() >= num_of_boards {
+                                    self.winning_number = *number;
+                                    self.winning_board = *board;
+                                    return Ok(self);
+                                }
+                            }
 
                         }
                     }
-
                 }
             }
         }
@@ -88,10 +99,11 @@ impl Bingo {
     fn get(&self) -> u32 {
         let mut result = 0;
         for field in self.winning_board.fields.iter().flat_map(|r| r.iter()) {
-            if field.drawn == false {
+            if !field.drawn {
                 result += field.value;
             }
         }
+        println!("{}/{}",result, self.winning_number);
         result * self.winning_number
     }
 }
@@ -141,6 +153,19 @@ impl Board {
     }
 }
 
+impl std::fmt::Display for Board {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut output = "".to_string();
+        for (i, row) in self.fields.iter().enumerate() {
+            for (j, field) in row.iter().enumerate() {
+                output.push_str(format!("{}/{}/={},{}  \t", i, j, field.value, field.drawn).as_str());
+            }
+            output.push('\n');
+        }
+        write!(f, "{}", output)
+    }
+}
+
 #[derive(Copy)]
 #[derive(Clone)]
 struct Field {
@@ -156,10 +181,11 @@ impl Field {
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>>
 {
-    let content = fs::read_to_string(config.file_path)?.replace("\r\n","\n");
+    let content = fs::read_to_string(config.file_path)?.replace("\r\n", "\n");
     let mut sub = Submarine::new();
     sub.bingo = Bingo::builder(content.as_str());
-    println!("Answer {}", sub.bingo.play()?.get());
+    println!("Win {}", sub.bingo.play(Strategy::Win)?.get());
+    println!("Lose {}", sub.bingo.play(Strategy::Lose)?.get());
     Ok(())
 }
 
@@ -169,7 +195,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_bingo_play() {
+    fn test_bingo_play_to_win() {
         let content: &str = "7,4,9,5,11,17,23,2,0,14,21,24,10,16,13,6,15,25,12,22,18,20,8,19,3,26,1
 
 22 13 17 11  0
@@ -190,17 +216,44 @@ mod tests {
 22 11 13  6  5
  2  0 12  3  7";
         let mut bingo = Bingo::builder(content);
-        bingo.play().expect("help");
-        for board in bingo.boards {
-            for (i, row) in board.fields.iter().enumerate() {
-                for (j, field) in row.iter().enumerate() {
-                    print!("{}/{}/={},{} ", i, j, field.value, field.drawn);
-                }
-                println!();
-            }
+        bingo.play(Strategy::Win).expect("help");
+        for board in &bingo.boards {
+            println!("{}", board);
         }
         assert_eq!(24, bingo.winning_number);
         assert_eq!(24, bingo.winning_board.fields[0][3].value);
+        assert_eq!(4512, bingo.get());
+    }
+
+    #[test]
+    fn test_bingo_play_to_lose() {
+        let content: &str = "7,4,9,5,11,17,23,2,0,14,21,24,10,16,13,6,15,25,12,22,18,20,8,19,3,26,1
+
+22 13 17 11  0
+ 8  2 23  4 24
+21  9 14 16  7
+ 6 10  3 18  5
+ 1 12 20 15 19
+
+ 3 15  0  2 22
+ 9 18 13 17  5
+19  8  7 25 23
+20 11 10 24  4
+14 21 16 12  6
+
+14 21 17 24  4
+10 16 15  9 19
+18  8 23 26 20
+22 11 13  6  5
+ 2  0 12  3  7";
+        let mut bingo = Bingo::builder(content);
+        bingo.play(Strategy::Lose).expect("help");
+        for board in &bingo.boards {
+            println!("{}", board);
+        }
+        assert_eq!(12, bingo.winning_number);
+        assert_eq!(2, bingo.winning_board.fields[0][3].value);
+        assert_eq!(1080, bingo.get());
     }
 
     #[test]
@@ -283,12 +336,7 @@ mod tests {
 22 11 13  6  5
  2  1 12  3  7";
         let board: Board = Board::builder(content);
-        for (i, row) in board.fields.iter().enumerate() {
-            for (j, field) in row.iter().enumerate() {
-                print!("{}/{}/={} ", i, j, field.value);
-            }
-            println!();
-        }
+        println!("{}", board);
         assert_eq!(16, board.fields[1][1].value);
         assert_eq!(21, board.fields[0][1].value);
         assert_eq!(3, board.fields[4][3].value);
