@@ -31,6 +31,9 @@ impl Submarine {
     fn new() -> Submarine {
         Submarine { bingo: Bingo::new() }
     }
+    fn builder(s:&str) -> Submarine {
+        Submarine{ bingo: Bingo::builder(s)}
+    }
 }
 
 enum Strategy {
@@ -103,7 +106,6 @@ impl Bingo {
                 result += field.value;
             }
         }
-        println!("{}/{}",result, self.winning_number);
         result * self.winning_number
     }
 }
@@ -138,15 +140,22 @@ impl Board {
         self
     }
     fn has_bingo(&self) -> bool {
-        for row in self.fields.iter() {
-            for (i, field) in row.iter().enumerate() {
-                if field.drawn {
-                    if i >= 4 {
+        for i in 0..5{
+            let mut count1 = 0;
+            let mut count2 = 0;
+            for j in 0..5{
+                if self.fields[i][j].drawn {
+                    count1 += 1;
+                    if count1 >= 5{
                         return true;
                     }
-                    continue;
-                }
-                break;
+                };
+                if self.fields[j][i].drawn {
+                    count2 += 1;
+                    if count2 >= 5{
+                        return true;
+                    }
+                };
             }
         }
         false
@@ -182,8 +191,7 @@ impl Field {
 pub fn run(config: Config) -> Result<(), Box<dyn Error>>
 {
     let content = fs::read_to_string(config.file_path)?.replace("\r\n", "\n");
-    let mut sub = Submarine::new();
-    sub.bingo = Bingo::builder(content.as_str());
+    let mut sub = Submarine::builder(content.as_str());
     println!("Win {}", sub.bingo.play(Strategy::Win)?.get());
     println!("Lose {}", sub.bingo.play(Strategy::Lose)?.get());
     Ok(())
@@ -251,9 +259,9 @@ mod tests {
         for board in &bingo.boards {
             println!("{}", board);
         }
-        assert_eq!(12, bingo.winning_number);
+        assert_eq!(13, bingo.winning_number);
         assert_eq!(2, bingo.winning_board.fields[0][3].value);
-        assert_eq!(1080, bingo.get());
+        assert_eq!(1924, bingo.get());
     }
 
     #[test]
@@ -269,7 +277,7 @@ mod tests {
     }
 
     #[test]
-    fn test_board_check() {
+    fn test_board_check_horizontal() {
         let mut board: Board = Board::builder("22 13 17 11  0
                                           8  2 23  4 24
                                           21  9 14 16  7
@@ -278,6 +286,20 @@ mod tests {
         assert_eq!(false, board.has_bingo());
         for i in 0..5 {
             board.fields[1][i].drawn = true;
+        }
+        assert_eq!(true, board.has_bingo());
+    }
+
+    #[test]
+    fn test_board_check_vertical() {
+        let mut board: Board = Board::builder("22 13 17 11  0
+                                          8  2 23  4 24
+                                          21  9 14 16  7
+                                          6 10  3 18  5
+                                          1 12 20 15 19");
+        assert_eq!(false, board.has_bingo());
+        for i in 0..5 {
+            board.fields[i][1].drawn = true;
         }
         assert_eq!(true, board.has_bingo());
     }
